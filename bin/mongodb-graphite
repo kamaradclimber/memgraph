@@ -1,0 +1,40 @@
+#!/usr/bin/env ruby
+
+require 'graphite'
+require 'dalli'
+
+
+
+graphite_server = ARGV[0]
+
+memcaches = ARGV[1] # host:port[,host:port,...]
+
+g = Graphite::Logger.new(graphite_server)
+
+to_ignore =[ "pid"]
+to_convert = []
+
+prefix_common = "memcache."
+
+
+
+
+memcache = Dalli::Client::new(memcaches)
+stats = memcache.stats
+memcache.close
+
+stats.each do |instance,values|
+  host,port = instance.split(":")[0..1]
+  host = host.gsub(".","_")
+  
+  prefix = prefix_common + host+"."+ port + "."
+  to_ignore.each { |key| values.delete( key) }
+  metrics = {}
+  values.each { |key,value| metrics[prefix +key] = value}
+  puts metrics
+  g.log(`date +%s`, metrics)
+
+end
+
+
+
